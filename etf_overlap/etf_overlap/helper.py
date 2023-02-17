@@ -29,6 +29,19 @@ class EquityHelpers:
         equity_df = pd.DataFrame.from_dict(new_eq_json)
         return equity_df
 
+    def merge_with_holdings(self, holdings_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Merge holdings data with equity data generated
+        using get_equity_data().
+        """
+        equity_df = self.get_equity_data()
+        merged = holdings_df.merge(
+            equity_df,
+            how='left',
+            on='symbol'
+        )
+        return merged
+
 class ETFHelpers(EquityHelpers):
     """ Contains helper functions for ETF data. """
 
@@ -78,37 +91,34 @@ class ETFHelpers(EquityHelpers):
         self.greater = self.etf_1 if etf_1_total > etf_2_total else self.etf_2
         self.lesser = self.etf_1 if etf_1_total < etf_2_total else self.etf_2
         
-    def get_lesser_overlap(self) -> float:
+    def get_percent_overlap(self, etf: str) -> float:
         """
-        Get percentage of the lesser ETF that overlaps with the greater ETF. 
+        Get percentage of overlapping holdings.
         """
+        assert etf in (self.etf_1, self.etf_2), 'ETF not in initialized pair'
         merged_etfs = self.merged_etfs
         overlap = merged_etfs[merged_etfs['_merge'] == 'both']
-        return round(overlap[f'percent_{self.lesser}'].sum(), 2)
+        return round(overlap[f'percent_{etf}'].sum(), 2)
 
-    def get_greater_overlap(self) -> float:
+    def get_holdings_overlap(self, etf: str) -> pd.DataFrame:
+        """
+        Get overlapping holdings based on percentages.
+        """
+        assert etf in (self.etf_1, self.etf_2), 'ETF not in initialized pair'
         merged_etfs = self.merged_etfs
         overlap = merged_etfs[merged_etfs['_merge'] == 'both']
-        return round(overlap[f'percent_{self.greater}'].sum(), 2)
-
-    def get_lesser_top_overlaps(self, n: int = 10) -> pd.DataFrame:
-        """
-        Get top n overlapping holdings in the lesser stock
-        based on percentages. 
-        """
-        lesser = self.lesser
-        merged_etfs = self.merged_etfs
-        overlap = merged_etfs[merged_etfs['_merge'] == 'both']
-        overlap = overlap.sort_values(f'percent_{lesser}', ascending=False)
-        overlap = overlap[['symbol', 'name', f'percent_{lesser}', f'shares_{lesser}']]
+        overlap = overlap.sort_values(f'percent_{etf}', ascending=False)
+        overlap = overlap[['symbol', 'name', f'percent_{etf}', f'shares_{etf}']]
         overlap.columns = ['symbol', 'name', 'percent', 'shares']
+        overlap = self.merge_with_holdings(overlap)
+        return overlap
 
-        # Merge with equity dataframe
-        equity_df = self.get_equity_data()
-        overlap = overlap.merge(
-            equity_df,
-            how='left',
-            on='symbol')
+    def get_top_overlapping_holdings(self, etf: str, n: int = 10) -> pd.DataFrame:
+        """
+        Display top n overlapping holdings.
+        """
+        assert etf in (self.etf_1, self.etf_2), 'ETF not in initialized pair'
+        overlap = self.get_holdings_overlap(etf)
         return overlap.head(n)
 
     @staticmethod
