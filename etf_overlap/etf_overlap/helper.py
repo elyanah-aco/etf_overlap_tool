@@ -1,10 +1,36 @@
-import numpy as np
-import pandas as pd
 
+import financedatabase as fd
+import pandas as pd
 from openbb_terminal.sdk import openbb
 
-class ETFHelpers:
-    """ Contains helper functions. """
+class EquityHelpers:
+    """ Contains helper functions for equity data. """
+    
+    def get_equity_data(self) -> pd.DataFrame:
+        """
+        Get dataframe of stock data
+        (ticker, name, sector, industry, country)
+        """
+
+        orig_eq_json = fd.select_equities()
+        new_eq_json = {
+            'symbol': [],
+            'sector': [],
+            'industry': [],
+            'country': []
+            }
+
+        for symbol in orig_eq_json:
+            if symbol != '':
+                new_eq_json['symbol'].append(symbol)
+                new_eq_json['sector'].append(orig_eq_json[symbol]['sector'])
+                new_eq_json['industry'].append(orig_eq_json[symbol]['industry'])
+                new_eq_json['country'].append(orig_eq_json[symbol]['country'])
+        equity_df = pd.DataFrame.from_dict(new_eq_json)
+        return equity_df
+
+class ETFHelpers(EquityHelpers):
+    """ Contains helper functions for ETF data. """
 
     def __init__(self, etf_1: str, etf_2: str):
         self.etf_1 = etf_1
@@ -38,7 +64,6 @@ class ETFHelpers:
                 Maybe you misspelled a symbol?
                 """)
             
-
     def set_etf_size(self) -> None:
         """
         Determine which ETF is "lesser" or "greater" based on
@@ -77,6 +102,13 @@ class ETFHelpers:
         overlap = overlap.sort_values(f'percent_{lesser}', ascending=False)
         overlap = overlap[['symbol', 'name', f'percent_{lesser}', f'shares_{lesser}']]
         overlap.columns = ['symbol', 'name', 'percent', 'shares']
+
+        # Merge with equity dataframe
+        equity_df = self.get_equity_data()
+        overlap = overlap.merge(
+            equity_df,
+            how='left',
+            on='symbol')
         return overlap.head(n)
 
     @staticmethod
